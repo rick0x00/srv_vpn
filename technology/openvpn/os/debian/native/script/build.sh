@@ -9,6 +9,9 @@
 # Remote repository 1: https://github.com/rick0x00/srv_vpn     #
 # Remote repository 2: https://gitlab.com/rick0x00/srv_vpn     #
 # ============================================================ #
+# base content:
+#   https://community.openvpn.net/openvpn/wiki/HOWTO
+#   https://docs.vyos.io/en/equuleus/configuration/interfaces/openvpn.html
 
 # ============================================================ #
 # start root user checking
