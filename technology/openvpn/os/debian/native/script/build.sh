@@ -58,6 +58,7 @@ function configure_easyrsa_vars () {
     sed -i "/#set_var EASYRSA_REQ_ORG/s/#//" /etc/openvpn/easy-rsa/vars
     sed -i "/#set_var EASYRSA_REQ_EMAIL/s/#//" /etc/openvpn/easy-rsa/vars
     sed -i "/#set_var EASYRSA_REQ_OU/s/#//" /etc/openvpn/easy-rsa/vars
+    sed -i "/#set_var EASYRSA_BATCH/s/#//" /etc/openvpn/easy-rsa/vars
 
     sed -i "/set_var EASYRSA_DN/s/cn_only/org/" /etc/openvpn/easy-rsa/vars
     sed -i "/set_var EASYRSA_KEY_SIZE/s/2048/2048/" /etc/openvpn/easy-rsa/vars
@@ -67,6 +68,7 @@ function configure_easyrsa_vars () {
     sed -i "/set_var EASYRSA_REQ_ORG/s/Copyleft Certificate Co/Copyleft Certificate rick0x00/" /etc/openvpn/easy-rsa/vars
     sed -i "/set_var EASYRSA_REQ_EMAIL/s/me@example.net/rick.0x00@gmail.com/" /etc/openvpn/easy-rsa/vars
     sed -i "/set_var EASYRSA_REQ_OU/s/My Organizational Unit/rick0x00/" /etc/openvpn/easy-rsa/vars
+    sed -i '/set_var EASYRSA_BATCH/s/""/"yes"/' /etc/openvpn/easy-rsa/vars
 
 }
 
@@ -182,13 +184,13 @@ function enabling_routing_between_interfaces () {
 }
 
 function configure_server () {
-    #configure_easyrsa_vars;
-    #create_certificates_for_server;
-    #create_certificates_for_client;
+    configure_easyrsa_vars;
+    create_certificates_for_server;
+    create_certificates_for_client;
     create_config_file_for_openvpn_server;
     create_config_file_for_openvpn_client;
-    #enabling_nat_for_vpn_network;
-    #enabling_routing_between_interfaces;
+    enabling_nat_for_vpn_network;
+    enabling_routing_between_interfaces;
 }
 
 function start_server () {
@@ -208,6 +210,6 @@ function start_server () {
 # end argument reading
 # ============================================================ #
 # start main executions of code
-#install_server;
+install_server;
 configure_server;
-start_server;
+#start_server;
