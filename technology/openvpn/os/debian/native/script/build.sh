@@ -26,12 +26,30 @@ fi
 os_distribution="debian"
 os_version=("11" "bullseye")
 
-port[0]="XPTO" # description
-port[1]="bar" # description
+org_country="BR" # Code of Country Name
+org_province="Alagoas" # Province name
+org_city="Maceio" # City name
+org_co="rick0x00" # Copyleft Certificate Co
+org_email="rick.0x00@gmail.com" # email address
+org_ou="TI" # Organization Unit
 
-workdir="workdir"
-persistence_volumes=("persistence_volume_N" "Logs")
-expose_ports="${port[0]}/tcp ${port[1]}/udp"
+key_size="2048"
+
+openvpn_server_name="central"
+openvpn_server_host="192.168.56.22"
+
+openvpn_client_name="client0"
+
+openvpn_private_network_address="10.10.10.0"
+openvpn_private_network_lmask="255.255.255.0"
+openvpn_private_network_smask="24"
+
+openvpn_port[0]="1194" # OpenVPN number Port listening
+openvpn_port[1]="udp" # OpenVPN protocol Port listening
+
+workdir="etc/openvpn"
+persistence_volumes=("/etc/openvpn/" "/var/log/openvpn/")
+expose_ports="${openvpn_port[0]}/${openvpn_port[1]}"
 # end set variables
 # ============================================================ #
 # start definition functions
@@ -61,13 +79,13 @@ function configure_easyrsa_vars () {
     sed -i "/#set_var EASYRSA_BATCH/s/#//" /etc/openvpn/easy-rsa/vars
 
     sed -i "/set_var EASYRSA_DN/s/cn_only/org/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_KEY_SIZE/s/2048/2048/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_REQ_COUNTRY/s/US/BR/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_REQ_PROVINCE/s/California/Alagoas/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_REQ_CITY/s/San Francisco/Maceio/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_REQ_ORG/s/Copyleft Certificate Co/Copyleft Certificate rick0x00/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_REQ_EMAIL/s/me@example.net/rick.0x00@gmail.com/" /etc/openvpn/easy-rsa/vars
-    sed -i "/set_var EASYRSA_REQ_OU/s/My Organizational Unit/rick0x00/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_KEY_SIZE/s/2048/${key_size}/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_REQ_COUNTRY/s/US/${org_country}/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_REQ_PROVINCE/s/California/${org_province}/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_REQ_CITY/s/San Francisco/${org_city}/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_REQ_ORG/s/Copyleft Certificate Co/${org_co}/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_REQ_EMAIL/s/me@example.net/${org_email}/" /etc/openvpn/easy-rsa/vars
+    sed -i "/set_var EASYRSA_REQ_OU/s/My Organizational Unit/${org_ou}/" /etc/openvpn/easy-rsa/vars
     sed -i '/set_var EASYRSA_BATCH/s/""/"yes"/' /etc/openvpn/easy-rsa/vars
 
 }
@@ -78,8 +96,8 @@ function create_certificates_for_server () {
     ./easyrsa build-ca nopass # cria ca.crt
     ./easyrsa gen-dh # cria dh.pem
     ./easyrsa gen-crl # cria crl.pem, para que server ?
-    ./easyrsa gen-req central nopass # cria central.key
-    ./easyrsa sign-req server central # cria central.crt
+    ./easyrsa gen-req $openvpn_server_name nopass # cria $openvpn_server_name.key
+    ./easyrsa sign-req server $openvpn_server_name # cria $openvpn_server_name.crt
 
     openvpn --genkey secret ta.key
 
@@ -89,29 +107,29 @@ function create_certificates_for_server () {
     cp pki/crl.pem /etc/openvpn/config
     cp ta.key /etc/openvpn/config
 
-    cp pki/private/central.key /etc/openvpn/config
-    cp pki/issued/central.crt  /etc/openvpn/config
+    cp pki/private/${openvpn_server_name}.key /etc/openvpn/config
+    cp pki/issued/${openvpn_server_name}.crt  /etc/openvpn/config
 } 
 
 function create_certificates_for_client () {
     cd /etc/openvpn/easy-rsa/
-    ./easyrsa build-client-full client0 nopass
+    ./easyrsa build-client-full $openvpn_client_name nopass
 
-    cp pki/private/client0.key /etc/openvpn/config
-    cp pki/issued/client0.crt /etc/openvpn/config
+    cp pki/private/${openvpn_client_name}.key /etc/openvpn/config
+    cp pki/issued/${openvpn_client_name}.crt /etc/openvpn/config
 }
 
 
 function create_config_file_for_openvpn_server () {
     #cp /etc/openvpn/server.conf /etc/openvpn/server.conf.bkp_$(date +%s)
-    echo "port 1194
-    proto udp
+    echo "port ${openvpn_port[0]}
+    proto ${openvpn_port[1]}
     dev tun
     ca /etc/openvpn/config/ca.crt
-    cert /etc/openvpn/config/central.crt
-    key /etc/openvpn/config/central.key 
+    cert /etc/openvpn/config/${openvpn_server_name}.crt
+    key /etc/openvpn/config/${openvpn_server_name}.key 
     dh /etc/openvpn/config/dh.pem
-    server 10.10.10.0 255.255.255.0
+    server ${openvpn_private_network_address} ${openvpn_private_network_lmask}
     #push \"redirect-gateway def1 bypass-dhcp\"
     push \"route 0.0.0.0 0.0.0.0 vpn_gateway\"
     push \"dhcp-option DNS 1.1.1.1\"
@@ -135,11 +153,11 @@ function create_config_file_for_openvpn_server () {
 }
 
 function create_config_file_for_openvpn_client () {
-    #cp /etc/openvpn/client0.ovpn /etc/openvpn/client0.ovpn.bkp_$(date +%s)
+    #cp /etc/openvpn/${openvpn_client_name}.ovpn /etc/openvpn/${openvpn_client_name}.ovpn.bkp_$(date +%s)
     echo "client
     dev tun
-    remote 192.168.56.22 1194
-    proto udp
+    remote ${openvpn_server_host} ${openvpn_port[0]}
+    proto ${openvpn_port[1]}
     resolv-retry infinite
     nobind
     persist-key
@@ -154,28 +172,28 @@ function create_config_file_for_openvpn_client () {
     auth-nocache
     remote-cert-tls server
     verb 3
-    " > /etc/openvpn/client0.ovpn
+    " > /etc/openvpn/${openvpn_client_name}.ovpn
 
-    #sed -i 's/^[[:space:]]\+//' /etc/openvpn/client0.ovpn
-    #sed -i 's/^[[:blank:]]\+//' /etc/openvpn/client0.ovpn
-    sed -i 's/^ \+//' /etc/openvpn/client0.ovpn
+    #sed -i 's/^[[:space:]]\+//' /etc/openvpn/${openvpn_client_name}.ovpn
+    #sed -i 's/^[[:blank:]]\+//' /etc/openvpn/${openvpn_client_name}.ovpn
+    sed -i 's/^ \+//' /etc/openvpn/${openvpn_client_name}.ovpn
 
-    echo "<ca>" >> /etc/openvpn/client0.ovpn
-    cat /etc/openvpn/config/ca.crt >> /etc/openvpn/client0.ovpn
-    echo -e "</ca>\n" >> /etc/openvpn/client0.ovpn
-    echo "<cert>" >> /etc/openvpn/client0.ovpn
-    cat /etc/openvpn/config/client0.crt >> /etc/openvpn/client0.ovpn
-    echo -e "</cert>\n" >> /etc/openvpn/client0.ovpn
-    echo "<key>" >> /etc/openvpn/client0.ovpn
-    cat /etc/openvpn/config/client0.key >> /etc/openvpn/client0.ovpn
-    echo -e "</key>\n" >> /etc/openvpn/client0.ovpn
-    echo "<tls-auth>" >> /etc/openvpn/client0.ovpn
-    cat /etc/openvpn/config/ta.key >> /etc/openvpn/client0.ovpn
-    echo -e "</tls-auth>\n" >> /etc/openvpn/client0.ovpn
+    echo "<ca>" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    cat /etc/openvpn/config/ca.crt >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo -e "</ca>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo "<cert>" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    cat /etc/openvpn/config/${openvpn_client_name}.crt >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo -e "</cert>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo "<key>" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    cat /etc/openvpn/config/${openvpn_client_name}.key >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo -e "</key>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo "<tls-auth>" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    cat /etc/openvpn/config/ta.key >> /etc/openvpn/${openvpn_client_name}.ovpn
+    echo -e "</tls-auth>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
 }
 
 function enabling_nat_for_vpn_network () {
-    iptables -t nat -A POSTROUTING -s 10.10.10.0/24 -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s ${openvpn_private_network_address}/${openvpn_private_network_smask} -o eth0 -j MASQUERADE
 }
 
 function enabling_routing_between_interfaces () {
@@ -198,6 +216,7 @@ function start_server () {
     systemctl stop openvpn@server
     systemctl enable --now openvpn@server
     systemctl start openvpn@server
+    # /usr/sbin/openvpn --daemon ovpn-server --status /run/openvpn/server.status 10 --cd /etc/openvpn --config /etc/openvpn/server.conf --writepid /run/openvpn/server.pid
     systemctl status --no-pager -l openvpn@server
 }
 
@@ -212,4 +231,4 @@ function start_server () {
 # start main executions of code
 install_server;
 configure_server;
-#start_server;
+start_server;
