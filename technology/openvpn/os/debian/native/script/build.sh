@@ -61,11 +61,13 @@ expose_ports="${openvpn_port[0]}/${openvpn_port[1]}"
 # start main functions
 
 function install_server () {
+    # Install OpenVPN 
     apt update
     apt install -y openvpn easy-rsa
 }
 
 function configure_easyrsa_vars () {
+    # Configure Vars to PKI
     cp -r /usr/share/easy-rsa /etc/openvpn
     cp /etc/openvpn/easy-rsa/vars.example /etc/openvpn/easy-rsa/vars
     sed -i "/#set_var EASYRSA_DN/s/#//" /etc/openvpn/easy-rsa/vars
@@ -91,14 +93,22 @@ function configure_easyrsa_vars () {
 }
 
 function create_certificates_for_server () {
+    # Create certificates for server
     cd /etc/openvpn/easy-rsa/
+    # Removes & re-initializes the PKI dir for a clean PKI
     ./easyrsa init-pki
+    # Creates a new CA
     ./easyrsa build-ca nopass # cria ca.crt
+    # Generates DH (Diffie-Hellman) parameters
     ./easyrsa gen-dh # cria dh.pem
-    ./easyrsa gen-crl # cria crl.pem, para que server ?
+    # Generate a CRL
+    ./easyrsa gen-crl # cria crl.pem
+    # Generate a standalone keypair and request (CSR) without password
     ./easyrsa gen-req $openvpn_server_name nopass # cria $openvpn_server_name.key
+    # Sign a certificate request
     ./easyrsa sign-req server $openvpn_server_name # cria $openvpn_server_name.crt
 
+    # Generate a new random key of type and write to file
     openvpn --genkey secret ta.key
 
     mkdir /etc/openvpn/config
@@ -112,7 +122,9 @@ function create_certificates_for_server () {
 } 
 
 function create_certificates_for_client () {
+    # Createc certificates for client
     cd /etc/openvpn/easy-rsa/
+    # Generate a keypair and sign locally for a client
     ./easyrsa build-client-full $openvpn_client_name nopass
 
     cp pki/private/${openvpn_client_name}.key /etc/openvpn/config
@@ -121,6 +133,7 @@ function create_certificates_for_client () {
 
 
 function create_config_file_for_openvpn_server () {
+    # Create a Server Config File
     #cp /etc/openvpn/server.conf /etc/openvpn/server.conf.bkp_$(date +%s)
     echo "port ${openvpn_port[0]}
     proto ${openvpn_port[1]}
@@ -130,7 +143,11 @@ function create_config_file_for_openvpn_server () {
     key /etc/openvpn/config/${openvpn_server_name}.key 
     dh /etc/openvpn/config/dh.pem
     server ${openvpn_private_network_address} ${openvpn_private_network_lmask}
+    ### Settings for the client apply
+    ## Create default route to direct internet traffic to vpn
+    # poor (includes all default routes from the server machine, Including local network)
     #push \"redirect-gateway def1 bypass-dhcp\"
+    # best (include default route only for internet access, Without local network)
     push \"route 0.0.0.0 0.0.0.0 vpn_gateway\"
     push \"dhcp-option DNS 1.1.1.1\"
     push \"dhcp-option DNS 8.8.4.4\"
@@ -153,6 +170,7 @@ function create_config_file_for_openvpn_server () {
 }
 
 function create_config_file_for_openvpn_client () {
+    # Create a Client vpn config file
     #cp /etc/openvpn/${openvpn_client_name}.ovpn /etc/openvpn/${openvpn_client_name}.ovpn.bkp_$(date +%s)
     echo "client
     dev tun
@@ -165,6 +183,7 @@ function create_config_file_for_openvpn_client () {
     #ca [inline]
     #cert [inline]
     #key [inline]
+    # the first line below needs to be replaced by the second line below work cirrectly
     #tls-auth [inline] 1
     key-direction 1
     keepalive 10 120
@@ -174,6 +193,7 @@ function create_config_file_for_openvpn_client () {
     verb 3
     " > /etc/openvpn/${openvpn_client_name}.ovpn
 
+    # Remobve a white apace from beginning of line
     #sed -i 's/^[[:space:]]\+//' /etc/openvpn/${openvpn_client_name}.ovpn
     #sed -i 's/^[[:blank:]]\+//' /etc/openvpn/${openvpn_client_name}.ovpn
     sed -i 's/^ \+//' /etc/openvpn/${openvpn_client_name}.ovpn
@@ -181,22 +201,27 @@ function create_config_file_for_openvpn_client () {
     echo "<ca>" >> /etc/openvpn/${openvpn_client_name}.ovpn
     cat /etc/openvpn/config/ca.crt >> /etc/openvpn/${openvpn_client_name}.ovpn
     echo -e "</ca>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
+
     echo "<cert>" >> /etc/openvpn/${openvpn_client_name}.ovpn
     cat /etc/openvpn/config/${openvpn_client_name}.crt >> /etc/openvpn/${openvpn_client_name}.ovpn
     echo -e "</cert>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    
     echo "<key>" >> /etc/openvpn/${openvpn_client_name}.ovpn
     cat /etc/openvpn/config/${openvpn_client_name}.key >> /etc/openvpn/${openvpn_client_name}.ovpn
     echo -e "</key>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
+    
     echo "<tls-auth>" >> /etc/openvpn/${openvpn_client_name}.ovpn
     cat /etc/openvpn/config/ta.key >> /etc/openvpn/${openvpn_client_name}.ovpn
     echo -e "</tls-auth>\n" >> /etc/openvpn/${openvpn_client_name}.ovpn
 }
 
 function enabling_nat_for_vpn_network () {
+    # Creates a firewall rule to NAT the traffic from the source of the VPN network, destined for the interface with internet access
     iptables -t nat -A POSTROUTING -s ${openvpn_private_network_address}/${openvpn_private_network_smask} -o eth0 -j MASQUERADE
 }
 
 function enabling_routing_between_interfaces () {
+    # Enable routing between network interfaces
     echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
     sysctl -p
 }
@@ -212,9 +237,12 @@ function configure_server () {
 }
 
 function start_server () {
+    # Stop openVPN service
     systemctl stop openvpn
     systemctl stop openvpn@server
+    # Enable openVPN Server service
     systemctl enable --now openvpn@server
+    # Start OpenVPN Serve service
     systemctl start openvpn@server
     # /usr/sbin/openvpn --daemon ovpn-server --status /run/openvpn/server.status 10 --cd /etc/openvpn --config /etc/openvpn/server.conf --writepid /run/openvpn/server.pid
     systemctl status --no-pager -l openvpn@server
