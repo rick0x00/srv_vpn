@@ -43,6 +43,7 @@ openvpn_client_name="client0"
 openvpn_private_network_address="10.10.10.0"
 openvpn_private_network_lmask="255.255.255.0"
 openvpn_private_network_smask="24"
+link_nat_out_vpn_network_interface="eth0"
 
 openvpn_port[0]="1194" # OpenVPN number Port listening
 openvpn_port[1]="udp" # OpenVPN protocol Port listening
@@ -217,7 +218,7 @@ function create_config_file_for_openvpn_client () {
 
 function enabling_nat_for_vpn_network () {
     # Creates a firewall rule to NAT the traffic from the source of the VPN network, destined for the interface with internet access
-    iptables -t nat -A POSTROUTING -s ${openvpn_private_network_address}/${openvpn_private_network_smask} -o eth0 -j MASQUERADE
+    iptables -t nat -A POSTROUTING -s ${openvpn_private_network_address}/${openvpn_private_network_smask} -o ${link_nat_out_vpn_network_interface} -j MASQUERADE
 }
 
 function enabling_routing_between_interfaces () {
