@@ -10,6 +10,6 @@ Steps to Install And Configure
 
 ```bash
 git clone https://github.com/rick0x00/srv_vpn.git
-cd srv_monitoring/technology/openvpn/os/debian/native/script
+cd srv_vpn/technology/openvpn/os/debian/native/script
 bash build.sh
 ```
