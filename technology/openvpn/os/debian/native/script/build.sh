@@ -99,15 +99,15 @@ function create_certificates_for_server () {
     # Removes & re-initializes the PKI dir for a clean PKI
     ./easyrsa init-pki
     # Creates a new CA
-    ./easyrsa build-ca nopass # cria ca.crt
+    ./easyrsa build-ca nopass # Create ca.crt
     # Generates DH (Diffie-Hellman) parameters
-    ./easyrsa gen-dh # cria dh.pem
+    ./easyrsa gen-dh # Create dh.pem
     # Generate a CRL
-    ./easyrsa gen-crl # cria crl.pem
+    ./easyrsa gen-crl # Create crl.pem
     # Generate a standalone keypair and request (CSR) without password
-    ./easyrsa gen-req $openvpn_server_name nopass # cria $openvpn_server_name.key
+    ./easyrsa gen-req $openvpn_server_name nopass # Create $openvpn_server_name.key
     # Sign a certificate request
-    ./easyrsa sign-req server $openvpn_server_name # cria $openvpn_server_name.crt
+    ./easyrsa sign-req server $openvpn_server_name # Create $openvpn_server_name.crt
 
     # Generate a new random key of type and write to file
     openvpn --genkey secret ta.key
